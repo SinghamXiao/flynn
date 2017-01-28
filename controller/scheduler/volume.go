@@ -1,30 +1,50 @@
 package main
 
-import "github.com/flynn/flynn/host/volume"
+import (
+	ct "github.com/flynn/flynn/controller/types"
+	"github.com/flynn/flynn/host/volume"
+)
 
 type Volume struct {
-	*volume.Info
+	ct.Volume
+}
 
-	AppID     string
-	ReleaseID string
-	JobType   string
-	Path      string
-	HostID    string
-	JobID     string
+func (v *Volume) Info() *volume.Info {
+	return &volume.Info{
+		ID:   v.ID,
+		Type: v.Type,
+		Meta: v.Meta,
+	}
 }
 
 func NewVolume(info *volume.Info, hostID string) *Volume {
 	return &Volume{
-		Info:      info,
-		AppID:     info.Meta["flynn-controller.app"],
-		ReleaseID: info.Meta["flynn-controller.release"],
-		JobType:   info.Meta["flynn-controller.type"],
-		Path:      info.Meta["flynn-controller.path"],
-		HostID:    hostID,
+		Volume: ct.Volume{
+			VolumeReq: ct.VolumeReq{
+				Path:         info.Meta["flynn-controller.path"],
+				DeleteOnStop: info.Meta["flynn-controller.delete_on_stop"] == "true",
+			},
+			ID:        info.ID,
+			HostID:    hostID,
+			Type:      info.Type,
+			AppID:     info.Meta["flynn-controller.app"],
+			ReleaseID: info.Meta["flynn-controller.release"],
+			JobType:   info.Meta["flynn-controller.type"],
+			Meta:      info.Meta,
+			CreatedAt: &info.CreatedAt,
+		},
 	}
 }
 
 type VolumeEvent struct {
-	Type   volume.EventType
+	Type   VolumeEventType
 	Volume *Volume
 }
+
+type VolumeEventType string
+
+const (
+	VolumeEventTypeCreate     VolumeEventType = "create"
+	VolumeEventTypeDestroy    VolumeEventType = "destroy"
+	VolumeEventTypeController VolumeEventType = "controller"
+)

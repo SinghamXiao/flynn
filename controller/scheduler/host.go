@@ -54,6 +54,11 @@ func (h *Host) TagsEqual(tags map[string]string) bool {
 	return true
 }
 
+func isAppVolume(info *volume.Info) bool {
+	_, ok := info.Meta["flynn-controller.app"]
+	return ok
+}
+
 func (h *Host) StreamVolumeEventsTo(ch chan *VolumeEvent) (map[string]*Volume, error) {
 	log := h.logger.New("fn", "StreamVolumeEventsTo", "host.id", h.ID)
 	var events chan *volume.Event
@@ -77,11 +82,14 @@ func (h *Host) StreamVolumeEventsTo(ch chan *VolumeEvent) (map[string]*Volume, e
 		log.Error("error getting volumes", "err", err)
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("got %d volumes for host %s", len(volumes), h.ID))
 	vols := make(map[string]*Volume)
-	for _, vol := range volumes {
-		vols[vol.ID] = &Volume{Info: vol, HostID: h.ID}
+	for _, info := range volumes {
+		if !isAppVolume(info) {
+			continue
+		}
+		vols[info.ID] = NewVolume(info, h.ID)
 	}
+	log.Info(fmt.Sprintf("got %d volumes for host %s", len(vols), h.ID))
 
 	go func() {
 		defer stream.Close()
@@ -94,10 +102,19 @@ func (h *Host) StreamVolumeEventsTo(ch chan *VolumeEvent) (map[string]*Volume, e
 					if !ok {
 						break eventLoop
 					}
-					ch <- &VolumeEvent{
-						Type:   event.Type,
-						Volume: &Volume{Info: event.Volume, HostID: h.ID},
+					if !isAppVolume(event.Volume) {
+						continue
 					}
+					e := &VolumeEvent{
+						Volume: NewVolume(event.Volume, h.ID),
+					}
+					switch event.Type {
+					case volume.EventTypeCreate:
+						e.Type = VolumeEventTypeCreate
+					case volume.EventTypeDestroy:
+						e.Type = VolumeEventTypeDestroy
+					}
+					ch <- e
 				case <-h.stop:
 					return
 				}
