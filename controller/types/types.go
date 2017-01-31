@@ -12,6 +12,7 @@ import (
 
 	"github.com/flynn/flynn/host/resource"
 	"github.com/flynn/flynn/host/types"
+	"github.com/flynn/flynn/host/volume"
 	"github.com/flynn/flynn/pkg/tlscert"
 	"github.com/flynn/flynn/router/types"
 	"github.com/jtacoma/uritemplates"
@@ -125,8 +126,24 @@ type Port struct {
 }
 
 type VolumeReq struct {
-	Path         string `json:"path"`
-	DeleteOnStop bool   `json:"delete_on_stop"`
+	Path         string `json:"path,omitempty"`
+	DeleteOnStop bool   `json:"delete_on_stop,omitempty"`
+}
+
+type Volume struct {
+	VolumeReq
+
+	ID               string            `json:"id"`
+	HostID           string            `json:"host_id"`
+	Type             volume.VolumeType `json:"type"`
+	AppID            string            `json:"app,omitempty"`
+	ReleaseID        string            `json:"release,omitempty"`
+	JobID            *string           `json:"job,omitempty"`
+	JobType          string            `json:"job_type,omitempty"`
+	Meta             map[string]string `json:"meta,omitempty"`
+	CreatedAt        *time.Time        `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time        `json:"updated_at,omitempty"`
+	DecommissionedAt *time.Time        `json:"decommissioned_at,omitempty"`
 }
 
 type ArtifactType string
@@ -213,6 +230,7 @@ type Job struct {
 	Type       string            `json:"type,omitempty"`
 	State      JobState          `json:"state,omitempty"`
 	Args       []string          `json:"args,omitempty"`
+	VolumeIDs  []string          `json:"volumes,omitempty"`
 	Meta       map[string]string `json:"meta,omitempty"`
 	ExitStatus *int32            `json:"exit_status,omitempty"`
 	HostError  *string           `json:"host_error,omitempty"`
@@ -426,6 +444,7 @@ const (
 	EventTypeAppGarbageCollection EventType = "app_garbage_collection"
 	EventTypeSink                 EventType = "sink"
 	EventTypeSinkDeletion         EventType = "sink_deletion"
+	EventTypeVolume               EventType = "volume"
 )
 
 type Event struct {

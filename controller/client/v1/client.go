@@ -679,6 +679,45 @@ func (c *Client) ProviderList() ([]*ct.Provider, error) {
 	return providers, c.Get("/providers", &providers)
 }
 
+// GetVolume returns a Volume for the given volume ID
+func (c *Client) GetVolume(id string) (*ct.Volume, error) {
+	vol := &ct.Volume{}
+	return vol, c.Get(fmt.Sprintf("/volumes/%s", id), vol)
+}
+
+// PutVolume updates an existing volume.
+func (c *Client) PutVolume(vol *ct.Volume) error {
+	if vol.ID == "" {
+		return errors.New("controller: missing id")
+	}
+	return c.Put(fmt.Sprintf("/volumes/%s", vol.ID), vol, vol)
+}
+
+// VolumeList returns a list of all volumes.
+func (c *Client) VolumeList() ([]*ct.Volume, error) {
+	var volumes []*ct.Volume
+	return volumes, c.Get("/volumes", &volumes)
+}
+
+// DecommissionVolume decommissions a volume
+func (c *Client) DecommissionVolume(vol *ct.Volume) error {
+	if vol.ID == "" {
+		return errors.New("controller: missing id")
+	}
+	return c.Put(fmt.Sprintf("/volumes/%s/decommission", vol.ID), &vol, &vol)
+}
+
+// StreamVolumes sends a series of Volume into the provided channel.
+// If since is not nil, only retrieves volume updates since the specified time.
+func (c *Client) StreamVolumes(since *time.Time, output chan *ct.Volume) (stream.Stream, error) {
+	if since == nil {
+		s := time.Unix(0, 0)
+		since = &s
+	}
+	t := since.UTC().Format(time.RFC3339Nano)
+	return c.Stream("GET", "/volumes?since="+t, nil, output)
+}
+
 // Backup takes a backup of the cluster
 func (c *Client) Backup() (io.ReadCloser, error) {
 	res, err := c.RawReq("GET", "/backup", nil, nil, nil)
